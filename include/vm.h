@@ -8,12 +8,17 @@
 
 class Vm {
  public:
-    Vm(int &vm_fd_num) : vm_fd(vm_fd_num) {}
+    static std::unique_ptr<Vm> Create(const int vm_fd_num);
 
     std::unique_ptr<Vcpu> CreateVcpu() const;
 
  private:
     FileHandle vm_fd;
+    void *mem;
+
+    Vm(const int vm_fd_num) : vm_fd(vm_fd_num) {}
+
+    bool Init();
 };
 
 #endif

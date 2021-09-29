@@ -18,6 +18,6 @@ std::unique_ptr<Vm> Kvm::CreateVm() const {
     if (vm_fd < 0) {
         return std::unique_ptr<Vm>(nullptr);
     } else {
-        return std::make_unique<Vm>(vm_fd);
+        return Vm::Create(vm_fd);
     }
 }
