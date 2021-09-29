@@ -1,7 +1,8 @@
 #include "vm.h"
 
+#include <asm/bootparam.h>
 #include <linux/kvm.h>
-#include <sys/mman.h>
+#include <sys/stat.h>
 
 absl::StatusOr<Vm> Vm::Create(const int vm_fd_num) {
     Vm vm(vm_fd_num);
@@ -20,8 +21,47 @@ absl::StatusOr<Vcpu> Vm::CreateVcpu() const {
         return absl::FailedPreconditionError(
             absl::StrCat("failed to create VCPU"));
     } else {
-        return Vcpu(vcpu_fd);
+        return Vcpu::Create(vcpu_fd);
     }
+}
+
+absl::Status Vm::LoadKernelImage(std::filesystem::path image_path) const {
+    size_t datasz;
+    void *data;
+    int fd = open(image_path.string().c_str(), O_RDONLY);
+    if (fd < 0) {
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to open kernel image"));
+    }
+
+    struct stat st;
+    fstat(fd, &st);
+    data = mmap(0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    datasz = st.st_size;
+    close(fd);
+
+    struct boot_params *boot =
+        (struct boot_params *)(((uint8_t *) this->mem) + 0x10000);
+    void *cmdline = (void *)(((uint8_t *) this->mem) + 0x20000);
+    void *kernel = (void *)(((uint8_t *) this->mem) + 0x100000);
+
+    memset(boot, 0, sizeof(struct boot_params));
+    memmove(boot, data, sizeof(struct boot_params));
+    size_t setup_sectors = boot->hdr.setup_sects;
+    size_t setupsz = (setup_sectors + 1) * 512;
+    boot->hdr.vid_mode = 0xFFFF; // VGA
+    boot->hdr.type_of_loader = 0xFF;
+    boot->hdr.ramdisk_image = 0x0;
+    boot->hdr.ramdisk_size = 0x0;
+    boot->hdr.loadflags |= CAN_USE_HEAP | 0x01 | KEEP_SEGMENTS;
+    boot->hdr.heap_end_ptr = 0xFE00;
+    boot->hdr.ext_loader_ver = 0x0;
+    boot->hdr.cmd_line_ptr = 0x20000;
+    memset(cmdline, 0, boot->hdr.cmdline_size);
+    memcpy(cmdline, "console=ttyS0", 14);
+    memmove(kernel, (char *)data + setupsz, datasz - setupsz);
+
+    return absl::OkStatus();
 }
 
 absl::Status Vm::Init() {
@@ -63,7 +103,7 @@ absl::Status Vm::Init() {
     }
 
     // Map a region of memory for the VM
-    this->mem = mmap(NULL, 1 << 30, PROT_READ | PROT_WRITE,
+    this->mem = mmap(NULL, kMemMapLength, PROT_READ | PROT_WRITE,
               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (this->mem == NULL) {
         return absl::FailedPreconditionError(

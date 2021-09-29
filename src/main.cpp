@@ -1,5 +1,6 @@
 #include "kvm.h"
 
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string_view>
@@ -15,6 +16,11 @@ void exit_if_error(absl::Status status) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " [kernel image path]" << std::endl;
+        exit(-1);
+    }
+
     absl::StatusOr<Kvm> kvm = Kvm::Create();
     exit_if_error(kvm.status());
 
@@ -23,6 +29,10 @@ int main(int argc, char *argv[]) {
 
     absl::StatusOr<Vcpu> vcpu = vm->CreateVcpu();
     exit_if_error(vcpu.status());
+
+    std::filesystem::path path(argv[1]);
+    absl::Status load_image_result = vm->LoadKernelImage(path);
+    exit_if_error(load_image_result);
 
     return 0;
 }
