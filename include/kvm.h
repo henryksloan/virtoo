@@ -4,15 +4,17 @@
 #include "file_handle.h"
 #include "vm.h"
 
+#include "absl/status/statusor.h"
+
 #include <memory>
 
 const char *const kKvmDevice = "/dev/kvm";
 
 class Kvm {
  public:
-    static std::unique_ptr<Kvm> Create();
+    static absl::StatusOr<Kvm> Create();
 
-    std::unique_ptr<Vm> CreateVm() const;
+    absl::StatusOr<Vm> CreateVm() const;
 
  private:
     FileHandle kvm_fd;

@@ -18,4 +18,8 @@ file(GLOB all_SRCS
         "${PROJECT_SOURCE_DIR}/src/*.c"
         )
 
+find_package(absl REQUIRED)
+
 add_executable(Virtoo ${all_SRCS})
+
+target_link_libraries(Virtoo absl::base absl::status absl::statusor absl::strings)

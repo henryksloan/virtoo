@@ -4,22 +4,25 @@
 #include <memory>
 #include <string_view>
 
-constexpr void exit_if(bool fail_condition, std::string_view verb) {
-    if (fail_condition) {
-        std::cerr << "failed to " << verb << std::endl;
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+
+void exit_if_error(absl::Status status) {
+    if (!status.ok()) {
+        std::cerr << status << std::endl;
         exit(-1);
     }
 }
 
 int main(int argc, char *argv[]) {
-    std::unique_ptr<Kvm> kvm = Kvm::Create();
-    exit_if(!kvm, "open /dev/kvm");
+    absl::StatusOr<Kvm> kvm = Kvm::Create();
+    exit_if_error(kvm.status());
 
-    std::unique_ptr<Vm> vm = kvm->CreateVm();
-    exit_if(!vm, "create vm");
+    absl::StatusOr<Vm> vm = kvm->CreateVm();
+    exit_if_error(vm.status());
 
-    std::unique_ptr<Vcpu> vcpu = vm->CreateVcpu();
-    exit_if(!vcpu, "create vcpu");
+    absl::StatusOr<Vcpu> vcpu = vm->CreateVcpu();
+    exit_if_error(vcpu.status());
 
     return 0;
 }

@@ -4,19 +4,21 @@
 #include <iostream>
 #include <cstdlib>
 
-std::unique_ptr<Kvm> Kvm::Create() {
+absl::StatusOr<Kvm> Kvm::Create() {
     FileHandle kvm_fd(kKvmDevice, O_RDWR);
     if (!kvm_fd.is_valid()) {
-        return std::unique_ptr<Kvm>(nullptr);
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to open ", kKvmDevice));
     } else {
-        return std::unique_ptr<Kvm>(new Kvm(kvm_fd));
+        return Kvm(kvm_fd);
     }
 }
 
-std::unique_ptr<Vm> Kvm::CreateVm() const {
+absl::StatusOr<Vm> Kvm::CreateVm() const {
     int vm_fd = this->kvm_fd.ioctl(KVM_CREATE_VM, nullptr);
     if (vm_fd < 0) {
-        return std::unique_ptr<Vm>(nullptr);
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to create VM"));
     } else {
         return Vm::Create(vm_fd);
     }

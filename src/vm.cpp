@@ -3,27 +3,29 @@
 #include <linux/kvm.h>
 #include <sys/mman.h>
 
-std::unique_ptr<Vm> Vm::Create(const int vm_fd_num) {
-    std::unique_ptr<Vm> vm = std::unique_ptr<Vm>(new Vm(vm_fd_num));
+absl::StatusOr<Vm> Vm::Create(const int vm_fd_num) {
+    Vm vm(vm_fd_num);
 
-    bool init_succeed = vm->Init();
+    bool init_succeed = vm.Init();
     if (init_succeed) {
         return vm;
     } else {
-        return std::unique_ptr<Vm>(nullptr);
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to initialize VM"));
     }
 }
 
-std::unique_ptr<Vcpu> Vm::CreateVcpu() const {
+absl::StatusOr<Vcpu> Vm::CreateVcpu() const {
     int vcpu_fd = this->vm_fd.ioctl(KVM_CREATE_VCPU, nullptr);
     if (vcpu_fd < 0) {
-        return std::unique_ptr<Vcpu>(nullptr);
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to create VCPU"));
     } else {
-        return std::make_unique<Vcpu>(vcpu_fd);
+        return Vcpu(vcpu_fd);
     }
 }
 
-// TODO: Consider propagating descriptive errors
+// TODO: Propagate descriptive errors using results
 bool Vm::Init() {
     // Set the GPA of the task state segment (TSS)
     int set_tss_result = this->vm_fd.ioctl(
