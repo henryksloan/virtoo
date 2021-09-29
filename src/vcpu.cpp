@@ -2,8 +2,8 @@
 
 #include <linux/kvm_para.h>
 
-absl::StatusOr<Vcpu> Vcpu::Create(const int vcpu_fd_num) {
-    Vcpu vcpu(vcpu_fd_num);
+absl::StatusOr<Vcpu> Vcpu::Create(const int vcpu_fd_num, const int vcpu_map_size) {
+    Vcpu vcpu(vcpu_fd_num, vcpu_map_size);
 
     absl::Status special_reg_status = vcpu.InitSpecialRegisters();
     if (!special_reg_status.ok()) {

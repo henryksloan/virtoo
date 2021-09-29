@@ -4,8 +4,8 @@
 #include <linux/kvm.h>
 #include <sys/stat.h>
 
-absl::StatusOr<Vm> Vm::Create(const int vm_fd_num) {
-    Vm vm(vm_fd_num);
+absl::StatusOr<Vm> Vm::Create(const int vm_fd_num, const int vcpu_map_size) {
+    Vm vm(vm_fd_num, vcpu_map_size);
 
     absl::Status init_status = vm.Init();
     if (init_status.ok()) {
@@ -21,7 +21,7 @@ absl::StatusOr<Vcpu> Vm::CreateVcpu() const {
         return absl::FailedPreconditionError(
             absl::StrCat("failed to create VCPU"));
     } else {
-        return Vcpu::Create(vcpu_fd);
+        return Vcpu::Create(vcpu_fd, this->vcpu_map_size);
     }
 }
 

@@ -6,7 +6,7 @@
 
 absl::StatusOr<Kvm> Kvm::Create() {
     FileHandle kvm_fd(kKvmDevice, O_RDWR);
-    if (!kvm_fd.is_valid()) {
+    if (!kvm_fd.isValid()) {
         return absl::FailedPreconditionError(
             absl::StrCat("failed to open ", kKvmDevice));
     } else {
@@ -20,6 +20,9 @@ absl::StatusOr<Vm> Kvm::CreateVm() const {
         return absl::FailedPreconditionError(
             absl::StrCat("failed to create VM"));
     } else {
-        return Vm::Create(vm_fd);
+        return Vm::Create(vm_fd, this->GetVcpuMapSize());
     }
 }
+
+// absl::Status Kvm::RunVcpu(const Vcpu &vcpu) const {
+// }
