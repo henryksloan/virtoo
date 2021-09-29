@@ -6,12 +6,11 @@
 absl::StatusOr<Vm> Vm::Create(const int vm_fd_num) {
     Vm vm(vm_fd_num);
 
-    bool init_succeed = vm.Init();
-    if (init_succeed) {
+    absl::Status init_status = vm.Init();
+    if (init_status.ok()) {
         return vm;
     } else {
-        return absl::FailedPreconditionError(
-            absl::StrCat("failed to initialize VM"));
+        return init_status;
     }
 }
 
@@ -25,14 +24,14 @@ absl::StatusOr<Vcpu> Vm::CreateVcpu() const {
     }
 }
 
-// TODO: Propagate descriptive errors using results
-bool Vm::Init() {
+absl::Status Vm::Init() {
     // Set the GPA of the task state segment (TSS)
     int set_tss_result = this->vm_fd.ioctl(
         KVM_SET_TSS_ADDR,
         reinterpret_cast<void *>(0xffffd000));
     if (set_tss_result < 0) {
-        return false;
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to set TSS address"));
     }
 
     // Set the GPA of the identity map
@@ -42,29 +41,33 @@ bool Vm::Init() {
         KVM_SET_IDENTITY_MAP_ADDR,
         &map_addr);
     if (set_identity_map_result < 0) {
-        return false;
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to set identity map address"));
     }
 
     // Initialize the virtual interrupt controller
     int create_irqchip_result = this->vm_fd.ioctl(KVM_CREATE_IRQCHIP, nullptr);
     if (create_irqchip_result < 0) {
-        return false;
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to create IRQ chip"));
     }
 
     // Configure and create the programmable interval timer
     struct kvm_pit_config pit = {
       .flags = 0,
     };
-    int create_pit2_result = this->vm_fd.ioctl(KVM_CREATE_PIT2, &pit);
-    if (create_pit2_result < 0) {
-        return false;
+    int create_pit_result = this->vm_fd.ioctl(KVM_CREATE_PIT2, &pit);
+    if (create_pit_result < 0) {
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to create PIT"));
     }
 
     // Map a region of memory for the VM
     this->mem = mmap(NULL, 1 << 30, PROT_READ | PROT_WRITE,
               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (this->mem == NULL) {
-        return false;
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to map memory region"));
     }
 
     // Configure the userspace region of the memory map
@@ -76,8 +79,9 @@ bool Vm::Init() {
         .userspace_addr = (__u64) this->mem,
     };
     if (this->vm_fd.ioctl(KVM_SET_USER_MEMORY_REGION, &region) < 0) {
-        return false;
+        return absl::FailedPreconditionError(
+            absl::StrCat("failed to configure userspace memory region"));
     }
 
-    return true;
+    return absl::OkStatus();
 }

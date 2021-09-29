@@ -4,6 +4,7 @@
 #include "vcpu.h"
 #include "file_handle.h"
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
 #include <memory>
@@ -20,7 +21,7 @@ class Vm {
 
     Vm(const int vm_fd_num) : vm_fd(vm_fd_num) {}
 
-    bool Init();
+    absl::Status Init();
 };
 
 #endif
