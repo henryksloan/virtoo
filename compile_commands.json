@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/henry/dev/virt/virtoo/build",
+  "command": "/usr/bin/c++  -I/home/henry/dev/virt/virtoo/include -I/home/henry/dev/virt/virtoo/src -std=gnu++20 -o CMakeFiles/Virtoo.dir/src/main.cpp.o -c /home/henry/dev/virt/virtoo/src/main.cpp",
+  "file": "/home/henry/dev/virt/virtoo/src/main.cpp"
+}
+]
