@@ -17,7 +17,6 @@ class Kvm {
     static absl::StatusOr<Kvm> Create();
 
     absl::StatusOr<Vm> CreateVm() const;
-    absl::Status RunVcpu(const Vcpu &vcpu) const;
 
     int GetVcpuMapSize() const {
         return this->vcpu_map_size;

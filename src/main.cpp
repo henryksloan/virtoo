@@ -34,5 +34,7 @@ int main(int argc, char *argv[]) {
     absl::Status load_image_result = vm->LoadKernelImage(path);
     exit_if_error(load_image_result);
 
+    vcpu->RunLoop();
+
     return 0;
 }

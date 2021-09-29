@@ -1,4 +1,5 @@
 #include "kvm.h"
+#include "kvm_cpuid.h"
 
 #include <linux/kvm.h>
 #include <iostream>
@@ -6,7 +7,7 @@
 
 absl::StatusOr<Kvm> Kvm::Create() {
     FileHandle kvm_fd(kKvmDevice, O_RDWR);
-    if (!kvm_fd.isValid()) {
+    if (!kvm_fd.IsValid()) {
         return absl::FailedPreconditionError(
             absl::StrCat("failed to open ", kKvmDevice));
     } else {
@@ -20,9 +21,10 @@ absl::StatusOr<Vm> Kvm::CreateVm() const {
         return absl::FailedPreconditionError(
             absl::StrCat("failed to create VM"));
     } else {
-        return Vm::Create(vm_fd, this->GetVcpuMapSize());
+        struct KvmCpuId kvm_cpuid;
+        kvm_cpuid.nent = sizeof(kvm_cpuid.entries) / sizeof(kvm_cpuid.entries[0]);
+        this->kvm_fd.ioctl(KVM_GET_SUPPORTED_CPUID, &kvm_cpuid);
+
+        return Vm::Create(vm_fd, this->GetVcpuMapSize(), kvm_cpuid);
     }
 }
-
-// absl::Status Kvm::RunVcpu(const Vcpu &vcpu) const {
-// }

@@ -15,7 +15,7 @@ class FileHandle {
 
     FileHandle(FileHandle &&other) {
         this->fd = other.fd;
-        other.markInvalid();
+        other.MarkInvalid();
     }
 
     ~FileHandle() {
@@ -28,11 +28,11 @@ class FileHandle {
     FileHandle &operator=(const FileHandle &) = delete;
     FileHandle &operator=(FileHandle &&) = delete;
 
-    int getRaw() const {
+    int GetRaw() const {
         return fd;
     }
 
-    bool isValid() const {
+    bool IsValid() const {
         return fd >= 0;
     }
 
@@ -43,7 +43,7 @@ class FileHandle {
  private:
     int fd;
 
-    void markInvalid() {
+    void MarkInvalid() {
         this->fd = -1;
     }
 };

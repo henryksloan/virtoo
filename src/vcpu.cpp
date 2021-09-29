@@ -1,8 +1,9 @@
 #include "vcpu.h"
 
 #include <linux/kvm_para.h>
+#include <iostream>
 
-absl::StatusOr<Vcpu> Vcpu::Create(const int vcpu_fd_num, const int vcpu_map_size) {
+absl::StatusOr<Vcpu> Vcpu::Create(const int vcpu_fd_num, const int vcpu_map_size, KvmCpuId &kvm_cpuid) {
     Vcpu vcpu(vcpu_fd_num, vcpu_map_size);
 
     absl::Status special_reg_status = vcpu.InitSpecialRegisters();
@@ -15,12 +16,42 @@ absl::StatusOr<Vcpu> Vcpu::Create(const int vcpu_fd_num, const int vcpu_map_size
         return reg_status;
     }
 
-    absl::Status cpuid_status = vcpu.InitCpuId();
+    absl::Status cpuid_status = vcpu.InitCpuId(kvm_cpuid);
     if (!cpuid_status.ok()) {
         return cpuid_status;
     }
 
     return vcpu;
+}
+
+int Vcpu::RunLoop() const {
+    while (true) {
+        int ret = this->vcpu_fd.ioctl(KVM_RUN, nullptr);
+        if (ret < 0) {
+            std::cerr << "kvm_run failed" << std::endl;
+            return -1;
+        }
+
+        switch (run->exit_reason) {
+        case KVM_EXIT_IO:
+          if (run->io.port == 0x3f8 && run->io.direction == KVM_EXIT_IO_OUT) {
+            uint32_t size = run->io.size;
+            uint64_t offset = run->io.data_offset;
+            printf("%.*s", size * run->io.count, (char *)run + offset);
+          } else if (run->io.port == 0x3f8 + 5 &&
+                     run->io.direction == KVM_EXIT_IO_IN) {
+            char *value = (char *)run + run->io.data_offset;
+            *value = 0x20;
+          }
+          break;
+        case KVM_EXIT_SHUTDOWN:
+          printf("shutdown\n");
+          return 0;
+        default:
+          printf("reason: %d\n", run->exit_reason);
+          return -1;
+        }
+    }
 }
 
 absl::Status Vcpu::InitSpecialRegisters() const {
@@ -91,15 +122,7 @@ absl::Status Vcpu::InitRegisters() const {
   return absl::OkStatus();
 }
 
-absl::Status Vcpu::InitCpuId() const {
-    struct {
-        uint32_t nent;
-        uint32_t padding;
-        struct kvm_cpuid_entry2 entries[100];
-    } kvm_cpuid;
-    kvm_cpuid.nent = sizeof(kvm_cpuid.entries) / sizeof(kvm_cpuid.entries[0]);
-    this->vcpu_fd.ioctl(KVM_GET_SUPPORTED_CPUID, &kvm_cpuid);
-
+absl::Status Vcpu::InitCpuId(KvmCpuId &kvm_cpuid) const {
     for (unsigned int i = 0; i < kvm_cpuid.nent; i++) {
         struct kvm_cpuid_entry2 *entry = &kvm_cpuid.entries[i];
         if (entry->function == KVM_CPUID_SIGNATURE) {
