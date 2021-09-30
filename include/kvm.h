@@ -2,6 +2,7 @@
 #define VIRTOO_KVM_H
 
 #include "file_handle.h"
+#include "kvm_cpuid.h"
 #include "vm.h"
 
 #include "absl/status/status.h"
@@ -25,10 +26,14 @@ class Kvm {
  private:
     FileHandle kvm_fd;
     int vcpu_map_size;
+    struct KvmCpuId kvm_cpuid;
 
     Kvm(FileHandle &kvm_fd) : kvm_fd(std::move(kvm_fd)) {
         this->vcpu_map_size = this->kvm_fd.ioctl(KVM_GET_VCPU_MMAP_SIZE, nullptr);
+        this->InitCpuId();
     }
+
+    void InitCpuId();
 };
 
 #endif

@@ -1,10 +1,10 @@
 #include "vcpu.h"
 
-#include <linux/kvm_para.h>
 #include <iostream>
 
-absl::StatusOr<Vcpu> Vcpu::Create(const int vcpu_fd_num, const int vcpu_map_size, KvmCpuId &kvm_cpuid) {
+absl::StatusOr<Vcpu> Vcpu::Create(const int vcpu_fd_num, const int vcpu_map_size, const KvmCpuId kvm_cpuid) {
     Vcpu vcpu(vcpu_fd_num, vcpu_map_size);
+    vcpu.InitCpuId(kvm_cpuid);
 
     absl::Status special_reg_status = vcpu.InitSpecialRegisters();
     if (!special_reg_status.ok()) {
@@ -14,11 +14,6 @@ absl::StatusOr<Vcpu> Vcpu::Create(const int vcpu_fd_num, const int vcpu_map_size
     absl::Status reg_status = vcpu.InitRegisters();
     if (!reg_status.ok()) {
         return reg_status;
-    }
-
-    absl::Status cpuid_status = vcpu.InitCpuId(kvm_cpuid);
-    if (!cpuid_status.ok()) {
-        return cpuid_status;
     }
 
     return vcpu;
@@ -35,21 +30,21 @@ int Vcpu::RunLoop() const {
         switch (run->exit_reason) {
         case KVM_EXIT_IO:
           if (run->io.port == 0x3f8 && run->io.direction == KVM_EXIT_IO_OUT) {
-            uint32_t size = run->io.size;
-            uint64_t offset = run->io.data_offset;
-            printf("%.*s", size * run->io.count, (char *)run + offset);
+              uint32_t size = run->io.size;
+              uint64_t offset = run->io.data_offset;
+              printf("%.*s", size * run->io.count, (char *)run + offset);
           } else if (run->io.port == 0x3f8 + 5 &&
                      run->io.direction == KVM_EXIT_IO_IN) {
-            char *value = (char *)run + run->io.data_offset;
-            *value = 0x20;
+              char *value = (char *)run + run->io.data_offset;
+              *value = 0x20;
           }
           break;
         case KVM_EXIT_SHUTDOWN:
-          printf("shutdown\n");
-          return 0;
+            printf("shutdown\n");
+            return 0;
         default:
-          printf("reason: %d\n", run->exit_reason);
-          return -1;
+            printf("reason: %d\n", run->exit_reason);
+            return -1;
         }
     }
 }
@@ -122,18 +117,6 @@ absl::Status Vcpu::InitRegisters() const {
   return absl::OkStatus();
 }
 
-absl::Status Vcpu::InitCpuId(KvmCpuId &kvm_cpuid) const {
-    for (unsigned int i = 0; i < kvm_cpuid.nent; i++) {
-        struct kvm_cpuid_entry2 *entry = &kvm_cpuid.entries[i];
-        if (entry->function == KVM_CPUID_SIGNATURE) {
-            entry->eax = KVM_CPUID_FEATURES;
-            entry->ebx = 0x4b4d564b; // KVMK
-            entry->ecx = 0x564b4d56; // VMKV
-            entry->edx = 0x4d;       // M
-        }
-    }
-
+void Vcpu::InitCpuId(KvmCpuId kvm_cpuid) const {
     this->vcpu_fd.ioctl(KVM_SET_CPUID2, &kvm_cpuid);
-
-    return absl::OkStatus();
 }

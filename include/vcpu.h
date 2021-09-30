@@ -12,7 +12,7 @@
 
 class Vcpu {
  public:
-    static absl::StatusOr<Vcpu> Create(const int vcpu_fd_num, const int vcpu_map_size, KvmCpuId &kvm_cpuid);
+    static absl::StatusOr<Vcpu> Create(const int vcpu_fd_num, const int vcpu_map_size, const KvmCpuId kvm_cpuid);
 
     int RunLoop() const;
 
@@ -26,7 +26,7 @@ class Vcpu {
 
     absl::Status InitSpecialRegisters() const;
     absl::Status InitRegisters() const;
-    absl::Status InitCpuId(KvmCpuId &kvm_cpuid) const;
+    void InitCpuId(KvmCpuId kvm_cpuid) const;
 };
 
 #endif

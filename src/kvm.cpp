@@ -1,7 +1,7 @@
 #include "kvm.h"
-#include "kvm_cpuid.h"
 
 #include <linux/kvm.h>
+#include <linux/kvm_para.h>
 #include <iostream>
 #include <cstdlib>
 
@@ -21,10 +21,21 @@ absl::StatusOr<Vm> Kvm::CreateVm() const {
         return absl::FailedPreconditionError(
             absl::StrCat("failed to create VM"));
     } else {
-        struct KvmCpuId kvm_cpuid;
-        kvm_cpuid.nent = sizeof(kvm_cpuid.entries) / sizeof(kvm_cpuid.entries[0]);
-        this->kvm_fd.ioctl(KVM_GET_SUPPORTED_CPUID, &kvm_cpuid);
+        return Vm::Create(vm_fd, this->GetVcpuMapSize(), this->kvm_cpuid);
+    }
+}
 
-        return Vm::Create(vm_fd, this->GetVcpuMapSize(), kvm_cpuid);
+void Kvm::InitCpuId() {
+    this->kvm_cpuid.nent = sizeof(kvm_cpuid.entries) / sizeof(kvm_cpuid.entries[0]);
+    this->kvm_fd.ioctl(KVM_GET_SUPPORTED_CPUID, &this->kvm_cpuid);
+
+    for (unsigned int i = 0; i < kvm_cpuid.nent; i++) {
+        struct kvm_cpuid_entry2 *entry = &kvm_cpuid.entries[i];
+        if (entry->function == KVM_CPUID_SIGNATURE) {
+            entry->eax = KVM_CPUID_FEATURES;
+            entry->ebx = 0x4b4d564b; // KVMK
+            entry->ecx = 0x564b4d56; // VMKV
+            entry->edx = 0x4d;       // M
+        }
     }
 }

@@ -4,7 +4,7 @@
 #include <linux/kvm.h>
 #include <sys/stat.h>
 
-absl::StatusOr<Vm> Vm::Create(const int vm_fd_num, const int vcpu_map_size, KvmCpuId &kvm_cpuid) {
+absl::StatusOr<Vm> Vm::Create(const int vm_fd_num, const int vcpu_map_size, const KvmCpuId kvm_cpuid) {
     Vm vm(vm_fd_num, vcpu_map_size, kvm_cpuid);
 
     absl::Status init_status = vm.Init();
