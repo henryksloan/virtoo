@@ -19,7 +19,7 @@ absl::StatusOr<Vcpu> Vm::CreateVcpu() const {
     int vcpu_fd = this->vm_fd.ioctl(KVM_CREATE_VCPU, nullptr);
     if (vcpu_fd < 0) {
         return absl::FailedPreconditionError(
-            absl::StrCat("failed to create VCPU"));
+          absl::StrCat("failed to create VCPU"));
     } else {
         return Vcpu::Create(vcpu_fd, this->vcpu_map_size, this->kvm_cpuid);
     }
@@ -31,7 +31,7 @@ absl::Status Vm::LoadKernelImage(std::filesystem::path image_path) const {
     int fd = open(image_path.string().c_str(), O_RDONLY);
     if (fd < 0) {
         return absl::FailedPreconditionError(
-            absl::StrCat("failed to open kernel image"));
+          absl::StrCat("failed to open kernel image"));
     }
 
     struct stat st;
@@ -41,9 +41,10 @@ absl::Status Vm::LoadKernelImage(std::filesystem::path image_path) const {
     close(fd);
 
     struct boot_params *boot =
-        (struct boot_params *)(((uint8_t *) this->mem) + 0x10000);
-    void *cmdline = (void *)(((uint8_t *) this->mem) + 0x20000);
-    void *kernel = (void *)(((uint8_t *) this->mem) + 0x100000);
+      (struct boot_params *)(((uint8_t *)this->mem) + 0x10000);
+    void *cmdline = (void *)(((uint8_t *)this->mem) + 0x20000);
+    // void *kernel = (void *)(((uint8_t *) this->mem) + 0x100000);
+    void *kernel = (void *)(((uint8_t *)this->mem) + 0x1000750);
 
     memset(boot, 0, sizeof(struct boot_params));
     memmove(boot, data, sizeof(struct boot_params));
@@ -67,47 +68,62 @@ absl::Status Vm::LoadKernelImage(std::filesystem::path image_path) const {
 absl::Status Vm::Init() {
     // Set the GPA of the task state segment (TSS)
     int set_tss_result = this->vm_fd.ioctl(
-        KVM_SET_TSS_ADDR,
-        reinterpret_cast<void *>(0xffffd000));
+      KVM_SET_TSS_ADDR,
+      // reinterpret_cast<void *>(0xffffd000));
+      reinterpret_cast<void *>(0xfffbd000));
     if (set_tss_result < 0) {
         return absl::FailedPreconditionError(
-            absl::StrCat("failed to set TSS address"));
+          absl::StrCat("failed to set TSS address"));
+    }
+
+    // Enable split IRQ
+    // http://events17.linuxfoundation.org/sites/events/files/slides/Performant%20Security%20Hardening_0.pdf
+    struct kvm_enable_cap split_irq_cap;
+    memset(&split_irq_cap, 0, sizeof(split_irq_cap));
+    split_irq_cap.cap = KVM_CAP_SPLIT_IRQCHIP;
+    split_irq_cap.args[0] = kNumIoapicPins;
+    int enable_split_irq_result = this->vm_fd.ioctl(
+      KVM_ENABLE_CAP,
+      &split_irq_cap);
+    if (enable_split_irq_result != 0) {
+        return absl::FailedPreconditionError(
+          absl::StrCat("failed to enable split IRQ"));
     }
 
     // Set the GPA of the identity map
     // TODO: Can this also be a reinterpret cast?
     __u64 map_addr = 0xffffc000;
     int set_identity_map_result = this->vm_fd.ioctl(
-        KVM_SET_IDENTITY_MAP_ADDR,
-        &map_addr);
+      KVM_SET_IDENTITY_MAP_ADDR,
+      &map_addr);
     if (set_identity_map_result < 0) {
         return absl::FailedPreconditionError(
-            absl::StrCat("failed to set identity map address"));
+          absl::StrCat("failed to set identity map address"));
     }
 
+    // TODO: This seems to be mutually exlusive to split IRQ; look into why
     // Initialize the virtual interrupt controller
-    int create_irqchip_result = this->vm_fd.ioctl(KVM_CREATE_IRQCHIP, nullptr);
-    if (create_irqchip_result < 0) {
-        return absl::FailedPreconditionError(
-            absl::StrCat("failed to create IRQ chip"));
-    }
+    // int create_irqchip_result = this->vm_fd.ioctl(KVM_CREATE_IRQCHIP, nullptr);
+    // if (create_irqchip_result < 0) {
+    //     return absl::FailedPreconditionError(
+    //         absl::StrCat("failed to create IRQ chip"));
+    // }
 
     // Configure and create the programmable interval timer
     struct kvm_pit_config pit = {
-      .flags = 0,
+        .flags = 0,
     };
     int create_pit_result = this->vm_fd.ioctl(KVM_CREATE_PIT2, &pit);
     if (create_pit_result < 0) {
         return absl::FailedPreconditionError(
-            absl::StrCat("failed to create PIT"));
+          absl::StrCat("failed to create PIT"));
     }
 
     // Map a region of memory for the VM
-    this->mem = mmap(NULL, kMemMapLength, PROT_READ | PROT_WRITE,
-              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    this->mem = mmap(NULL, kMemMapLength, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (this->mem == NULL) {
         return absl::FailedPreconditionError(
-            absl::StrCat("failed to map memory region"));
+          absl::StrCat("failed to map memory region"));
     }
 
     // Configure the userspace region of the memory map
@@ -116,11 +132,11 @@ absl::Status Vm::Init() {
         .flags = 0,
         .guest_phys_addr = 0,
         .memory_size = 1 << 30,
-        .userspace_addr = (__u64) this->mem,
+        .userspace_addr = (__u64)this->mem,
     };
     if (this->vm_fd.ioctl(KVM_SET_USER_MEMORY_REGION, &region) < 0) {
         return absl::FailedPreconditionError(
-            absl::StrCat("failed to configure userspace memory region"));
+          absl::StrCat("failed to configure userspace memory region"));
     }
 
     return absl::OkStatus();
